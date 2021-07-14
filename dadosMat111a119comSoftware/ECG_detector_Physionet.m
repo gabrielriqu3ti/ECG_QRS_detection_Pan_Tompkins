@@ -126,7 +126,7 @@ for n =111:119
     for i=3:N
         if (ecgs_int(i,signal) - ecgs_int(i-1,signal))*(ecgs_int(i-1,signal) - ecgs_int(i-2,signal)) < 0 % mudança de sinal
             if pred_size > 1
-                if (ecgs_int(i,signal) > THRESHOLD_I1) && (i - pred(pred_size,1) > RR_LOW_LIMIT/4)% QRS encontrado
+                if (ecgs_int(i,signal) > THRESHOLD_I1) && (i - pred(pred_size,1) > RR_LOW_LIMIT)% QRS encontrado
                     SPKI = 0.125*ecgs_int(i,signal) + 0.875*SPKI;
                     pred(pred_size+1,1) = i;
                     pred_size = pred_size + 1;
