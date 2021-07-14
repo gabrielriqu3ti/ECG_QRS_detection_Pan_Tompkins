@@ -12,6 +12,7 @@ high = true; % habilita filtro passa-alta
 graphics = true; % habilita exibição de gráficos
 N_int = 30; % número de elementos usados na integração
 signal = 1; % sinal estudade (1 ou 2)
+save = true; % salva gráficos e tábela
 
 
 %% Design de Filtros
@@ -155,8 +156,14 @@ for n =111:119
                 RR_MISSED_LIMIT = 1.66*RR_AVERAGE_2;
                 if i - pred(pred_size) > RR_MISSED_LIMIT
                     % Implementar detecção retroativa
-                    disp([num2str(i - pred(pred_size,signal)), ' > RR_MISSED_LIMIT = ', num2str(RR_MISSED_LIMIT),...
-                        ' Não encontrou em ', num2str(i/Fs), ' signal há ', num2str((i - pred(pred_size,signal))/Fs), ' signal'])
+                    [peak, peak_i] = max(ecgs_int(pred(pred_size)+round(RR_LOW_LIMIT):i,signal));
+                    peak_i = peak_i + pred(pred_size) + round(RR_LOW_LIMIT) - 1;
+                    SPKI = 0.125*peak + 0.875*SPKI;
+                    pred(pred_size+1,1) = peak_i;
+                    pred_size = pred_size + 1;
+                    IRR(pred_size-1,1) = pred(pred_size,1) - pred(pred_size-1,1);
+                    THRESHOLD_I1 = NPKI + 0.25*(SPKI - NPKI);
+                    THRESHOLD_I2 = 0.5*THRESHOLD_I1;
                 end
             end
         end
@@ -196,7 +203,6 @@ for n =111:119
     i = length(ann);
     if (j > pred_size)
         FN(n-110,1) = FN(n-110,1) + 1;
-        disp(['j = ', num2str(j), ', i = ', num2str(i)])
     else
         while (j <= pred_size) && (pred(j,1) - delay < (ann(length(ann)) + ann(length(ann)-1))/2)
             FN(n-110,1) = FN(n-110,1) + 1;
@@ -253,25 +259,71 @@ end
 
 %% Estatísticas
 % Tabela
-casos = {'111.mat'; '112.mat'; '113.mat'; '114.mat'; '115.mat'; '116.mat'; '117.mat'; '118.mat'; '119.mat'};
-media_original = avg_ecg(:,1);
-dp_original = std_ecg(:,1);
-media_normalizado = avg_ecg_norm(:,1);
-dp_normalizado = std_ecg_norm(:,1);
-media_IRR_s = avg_IRR(:,1)./Fs;
-dp_IRR_s = std_IRR(:,1)./Fs;
+casos = {'111.mat'; '112.mat'; '113.mat'; '114.mat'; '115.mat'; '116.mat'; '117.mat'; '118.mat'; '119.mat'; 'media'; 'dp'};
+media_original = zeros(11,1);
+media_original(1:9,1) = avg_ecg(:,1);
+media_original(10,1) = mean(media_original(1:9,1));
+media_original(11,1) = std(media_original(1:9,1));
+dp_original = zeros(11,1);
+dp_original(1:9,1) = std_ecg(:,1);
+dp_original(10,1) = mean(dp_original(1:9,1));
+dp_original(11,1) = std(dp_original(1:9,1));
+media_normalizado = zeros(11,1);
+media_normalizado(1:9,1) = avg_ecg_norm(:,1);
+media_normalizado(10,1) = mean(media_normalizado(1:9,1));
+media_normalizado(11,1) = std(media_normalizado(1:9,1));
+dp_normalizado = zeros(11,1);
+dp_normalizado(1:9,1) = std_ecg_norm(:,1);
+dp_normalizado(10,1) = mean(dp_normalizado(1:9,1));
+dp_normalizado(11,1) = std(dp_normalizado(1:9,1));
+media_IRR_s = zeros(11,1);
+media_IRR_s(1:9,1) = avg_IRR(:,1)./Fs;
+media_IRR_s(10,1) = mean(media_IRR_s(1:9,1));
+media_IRR_s(11,1) = std(media_IRR_s(1:9,1));
+dp_IRR_s = zeros(11,1);
+dp_IRR_s(1:9,1) = std_IRR(:,1)./Fs;
+dp_IRR_s(10,1) = mean(dp_IRR_s(1:9,1));
+dp_IRR_s(11,1) = std(dp_IRR_s(1:9,1));
 bpm = media_IRR_s*60;
-TP = TP(:,1);
-FP = FP(:,1);
-FN = FN(:,1);
-Nv = TP + FN; % número de QRSs verdadeiros
-Nd = TP + FP; % número de QRSs detectados
-prct_FP = 100 .* FP ./ Nv; % Porcentagem de falso-positivos
-prct_FN = 100 .* FN ./ Nv; % Porcentagem de falso-negativos
+TP_aux = TP(:,1);
+TP = zeros(11,1);
+TP(1:9,1) = TP_aux(:,1);
+TP(10,1) = mean(TP(1:9,1));
+TP(11,1) = std(TP(1:9,1));
+FP_aux = FP(:,1);
+FP = zeros(11,1);
+FP(1:9,1) = FP_aux(:,1);
+FP(10,1) = mean(FP(1:9,1));
+FP(11,1) = std(FP(1:9,1));
+FN_aux = FN(:,1);
+FN = zeros(11,1);
+FN(1:9,1) = FN_aux(:,1);
+FN(10,1) = mean(FN(1:9,1));
+FN(11,1) = std(FN(1:9,1));
+Nv = zeros(11,1); % número de QRSs verdadeiros
+Nv(1:9,1) = TP(1:9,1) + FN(1:9,1);
+Nv(10,1) = mean(Nv(1:9,1));
+Nv(11,1) = std(Nv(1:9,1));
+Nd = zeros(11,1); % número de QRSs detectados
+Nd(1:9,1) = TP(1:9,1) + FP(1:9,1);
+Nd(10,1) = mean(Nd(1:9,1));
+Nd(11,1) = std(Nd(1:9,1));
+prct_FP = zeros(11,1); % porcentagem de falso-positivos
+prct_FP(1:9,1) = 100 .* FP(1:9,1) ./ Nv(1:9,1);
+prct_FP(10,1) = mean(prct_FP(1:9,1));
+prct_FP(11,1) = std(prct_FP(1:9,1));
+prct_FN = zeros(11,1); % porcentagem de falso-negativos
+prct_FN(1:9,1) = 100 .* FN(1:9,1) ./ Nv(1:9,1);
+prct_FN(10,1) = mean(prct_FN(1:9,1));
+prct_FN(11,1) = std(prct_FN(1:9,1));
 
 res_table = table(casos, media_original, dp_original, ...
     media_normalizado, dp_normalizado, Nv, ...
     Nd, FP, prct_FP, FN, prct_FN, media_IRR_s, dp_IRR_s, bpm);
+
+if save
+    writetable(res_table, ['table_signal_', num2str(signal),'.csv']);
+end
 
 fprintf('\n Fim \n');
 
