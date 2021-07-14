@@ -3,10 +3,15 @@
 % Grupo 7
 close all;
 clear;
+clc;
+
 
 %% Parâmetros
-low = true;
-high = true;
+low = true; % habilita filtro passa-baixa
+high = true; % habilita filtro passa-alta
+graphics = true; % habilita exibição de gráficos
+N_int = 30; % número de elementos usados na integração
+signal = 1; % sinal estudade (1 ou 2)
 
 
 %% Design de Filtros
@@ -22,44 +27,60 @@ num_high(1,18) = -32;
 num_high(1,33) = 1;
 den_high = 32 .* [1, -1];
 
+% Derivação
+num_d_dt = [2, 1, 0, -1, -2];
+den_d_dt = 8;
 
-avg_ecg = zeros(9,2);
-std_ecg = zeros(9,2);
-avg_ecg_norm = zeros(9,2);
-std_ecg_norm = zeros(9,2);
-n = 111;
+% Integração
+num_int = ones(1,N_int);
+den_int = N_int;
+
+
+ann_total = 0;
+pred_total = [0; 0];
+avg_ecg = zeros(9,1);
+std_ecg = zeros(9,1);
+avg_ecg_norm = zeros(9,1);
+std_ecg_norm = zeros(9,1);
+avg_IRR = zeros(9,1);
+std_IRR = zeros(9,1);
+TP = zeros(9,1);
+FP = zeros(9,1);
+FN = zeros(9,1);
 for n =111:119
-% if true
     %% Importação de dados
     arqnum =sprintf('%3d.mat', n);
     load(arqnum);      
     % save(arq_mat,'ecgs','ts','Fs','ann','type');  Ver documentacao abaixo sobre as variáveis
     % ecgs(Nt,2):[double] matriz com Nt linhas por 2 colunas. Cada coluna contém sinal com Nt amostras já calibradas em mV
-    % ts(Nt,1): [double] vetor com Nt instantes de tempo em s
+    % ts(Nt,1): [double] vetor com Nt instantes de tempo em signal
     % Fs: frequencia de amostragem em Hz
     % ann(Na,1):[double] vetor contendo a posicao (em amostra) da anotacao. Tem 'Na' anotacoes. Ex.: suponha que a terceira 
     %       anotacao ocorreu na amostra 270, entao p=ann(3) retornará p=270.
     % type(Na,1):[char] vetor com a anotacao para cada uma das 'Na' anotacoes.
     N = size(ecgs,1);
-    fprintf('\n %s com %d amostras', arqnum, N);
+    fprintf('%s sinal com %d amostras\n', arqnum, N);
     Ntypes = numel(type);
+    delay = 0;
     
     
     %% Média e desvio-padrão do sinal original
-    avg_ecg(n-110,:) = mean(ecgs);
-    std_ecg(n-110,:) = std(ecgs);
+    avg_ecg(n-110,1) = mean(ecgs(:,signal));
+    std_ecg(n-110,1) = std(ecgs(:,signal));
     
     
     %% Filtragem
     % Passa-baixa
     if low
         ecgs_filt = filter(num_low, den_low, ecgs);
+        delay = delay + 5;
     else
         ecgs_filt = ecgs;
     end
     % Passa-alta
     if high
         ecgs_filt = filter(num_high, den_high, ecgs_filt);
+        delay = delay + 16;
     end
     
     
@@ -68,50 +89,189 @@ for n =111:119
     
     
     %% Média e desvio-padrão do sinal normalizado
-    avg_ecg_norm(n-110,:) = mean(ecgs_norm);
-    std_ecg_norm(n-110,:) = std(ecgs_norm);
+    avg_ecg_norm(n-110,1) = mean(ecgs_norm(:,signal));
+    std_ecg_norm(n-110,1) = std(ecgs_norm(:,signal));
 
-    %% Predição
+
+    %% Derivada
+    decgs_dt = filter(num_d_dt, den_d_dt, ecgs_norm);
+    delay = delay + 3;
+    
+    
+    %% Quadrado
+    decgs_dt_2 = decgs_dt .^ 2;
+    
+    
+    %% Integração
+    ecgs_int = filter(num_int, den_int, decgs_dt_2);
+    delay = delay + round(N_int/2) - 7;
+    
+    
+    %% Limiar Adaptativo
+    pred = zeros(N,1);
+    pred_size = 0;
+    IRR = zeros(N,1);
+    % Inicialização
+    SPKI = prctile(ecgs_int(1:N,signal), 95); % estimação dos valores máximos de R
+    NPKI = 0; % estimação do valor máximo do ruído
+    THRESHOLD_I1 = SPKI/2; % limiar de detecção de onda R
+    THRESHOLD_I2 = THRESHOLD_I1 / 2; % limiar retroativo de detecção de onda R
+    RR_AVERAGE_1 = Fs;
+    RR_AVERAGE_2 = Fs;
+    RR_LOW_LIMIT = Fs/4;
+    RR_HIGH_LIMIT = 2*Fs;
+    RR_MISSED_LIMIT = 2*Fs;
+    % Loop
+    for i=3:N
+        if (ecgs_int(i,signal) - ecgs_int(i-1,signal))*(ecgs_int(i-1,signal) - ecgs_int(i-2,signal)) < 0 % mudança de sinal
+            if pred_size > 1
+                if (ecgs_int(i,signal) > THRESHOLD_I1) && (i - pred(pred_size,1) > RR_LOW_LIMIT/4)% QRS encontrado
+                    SPKI = 0.125*ecgs_int(i,signal) + 0.875*SPKI;
+                    pred(pred_size+1,1) = i;
+                    pred_size = pred_size + 1;
+                    IRR(pred_size-1,1) = pred(pred_size,1) - pred(pred_size-1,1);
+                else % ruído encontrado
+                    NPKI = 0.125*ecgs_int(i,signal) + 0.875*NPKI;
+                end
+            else
+                if ecgs_int(i,signal) > THRESHOLD_I1 % QRS encontrado
+                    SPKI = 0.125*ecgs_int(i,signal) + 0.875*SPKI;
+                    pred(pred_size+1,1) = i;
+                    pred_size = pred_size + 1;
+                else % ruído encontrado
+                    NPKI = 0.125*ecgs_int(i,signal) + 0.875*NPKI;
+                end
+            end
+            THRESHOLD_I1 = NPKI + 0.25*(SPKI - NPKI);
+            THRESHOLD_I2 = 0.5*THRESHOLD_I1;
+        end
+        if pred_size > 8
+            RR_AVERAGE_1 = sum(IRR(pred_size-8:pred_size-1,1)) / 8;
+            IRR_ok = IRR((IRR(1:pred_size-1,1) >= RR_LOW_LIMIT) & (IRR(1:pred_size-1,1) <= RR_HIGH_LIMIT));
+            if length(IRR_ok) > 8
+                RR_AVERAGE_2 = sum(IRR_ok(length(IRR_ok)-7:length(IRR_ok),1)) / 8;
+                RR_LOW_LIMIT = 0.92*RR_AVERAGE_2;
+                RR_HIGH_LIMIT = 1.16*RR_AVERAGE_2;
+                RR_MISSED_LIMIT = 1.66*RR_AVERAGE_2;
+                if i - pred(pred_size) > RR_MISSED_LIMIT
+                    % Implementar detecção retroativa
+                    disp([num2str(i - pred(pred_size,signal)), ' > RR_MISSED_LIMIT = ', num2str(RR_MISSED_LIMIT),...
+                        ' Não encontrou em ', num2str(i/Fs), ' signal há ', num2str((i - pred(pred_size,signal))/Fs), ' signal'])
+                end
+            end
+        end
+    end
+    
+    
+    %% Avaliação
+    ecgs_pt = ecgs_int;
+    pred = pred(pred(:,1) > 0,1);
+    IRR = IRR(IRR(:,1) > 0, 1);
+    avg_IRR(n-110,1) = mean(IRR);
+    std_IRR(n-110,1) = std(IRR);
+    ann_total = ann_total + length(ann); 
+    pred_total(1) = pred_total(1) + length(pred); 
+    j = 1;
+    fn = true;
+    if pred(j,1) - delay <= (ann(1) + ann(2))/2
+        TP(n-110,1) = TP(n-110,1) + 1;
+        j = j + 1;
+        fn = false; 
+    end
+    for i=2:length(ann)-1
+        if fn
+            FN(n-110,1) = FN(n-110,1) + 1;
+        end
+        fn = true;
+        while (j <= pred_size) && (pred(min(j,pred_size),1) - delay <= (ann(i) + ann(i+1))/2) && fn
+            if pred(j,1) - delay >= (ann(i) + ann(i-1))/2
+                TP(n-110,1) = TP(n-110,1) + 1;
+                fn = false;
+            else
+                FP(n-110,1) = FP(n-110,1) + 1;
+            end
+            j = j + 1;
+        end
+    end
+    i = length(ann);
+    if (j > pred_size)
+        FN(n-110,1) = FN(n-110,1) + 1;
+        disp(['j = ', num2str(j), ', i = ', num2str(i)])
+    else
+        while (j <= pred_size) && (pred(j,1) - delay < (ann(length(ann)) + ann(length(ann)-1))/2)
+            FN(n-110,1) = FN(n-110,1) + 1;
+            j = j + 1;
+        end
+        if j > pred_size
+            FN(n-110,1) = FN(n-110,1) + 1;
+        else
+            TP(n-110,1) = TP(n-110,1) + 1;
+            FP(n-110,1) = FP(n-110,1) + pred_size - j;
+        end
+    end
+    
+    if length(ann) ~= TP(n-110,1) + FN(n-110,1)
+        disp('AVISO: Há erros no sistema de avaliação !!!')
+        disp(['length(ann) == TP + FN : ', num2str(length(ann) == TP(n-110,1) + FN(n-110,1)), ' : ', num2str(length(ann)), ' == ', num2str(TP(n-110,1) + FN(n-110,1))])
+    end
+    if pred_size ~= TP(n-110,1) + FP(n-110,1)
+        disp('AVISO: Há erros no sistema de avaliação !!!')
+        disp(['pred_size == TP + FP : ', num2str(pred_size == TP(n-110,1) + FP(n-110,1)), ' : ', num2str(pred_size), ' == ', num2str(TP(n-110,1) + FP(n-110,1))])
+    end
     
     
     %% Visualização
-    figure;
-    max_ecg = max(ecgs(:,1))*ones(Ntypes,1);
-    subplot(4,1,1);
-    plot(ts(1:N), ecgs(1:N,1));
-    ylabel('mV');
-    xlabel('s');
-    grid on;
-    title([arqnum, ' sinal 1']);
-    hold on;
-    plot(ts(ann(ann<N)+1), ecgs(ann(ann<N)+1), 'ro');
-    text(ts(ann(ann<N)+1), max_ecg, type);                    
-    
-    subplot(4,1,2);
-    max_ecg_norm = max(ecgs_norm(:,1))*ones(Ntypes,1);
-    plot(ts(1:N), ecgs_norm(1:N,1));
-    ylabel('mV');
-    xlabel('s');
-    grid on;
-    title([arqnum, ' sinal 1 Pan-Thompkins']);
-    hold on;
-    plot(ts(ann(ann<N)+1+16+5), ecgs_norm(ann(ann<N)+1+16+5), 'ro');
-    text(ts(ann(ann<N)+1+16+5), max_ecg_norm, type);                    
-    
-    subplot(4,1,3);
-    plot(ts(1:N), ecgs(1:N,2));
-    ylabel('mV');
-    xlabel('s');
-    grid on;
-    title([arqnum, ' sinal 2']);
-    
-    subplot(4,1,4);
-    plot(ts(1:N), ecgs_norm(1:N,2));
-    ylabel('mV');
-    xlabel('s');
-    grid on;
-    title([arqnum, ' sinal 2 Pan-Thompkins']);
-    drawnow;
+    if graphics
+        figure;
+        max_ecg = max(ecgs(:,signal))*ones(Ntypes,1);
+        subplot(2,1,1);
+        plot(ts(1:N), ecgs(1:N,signal));
+        hold on;
+        plot(ts(ann(ann<N)+1), ecgs(ann(ann<N)+1,signal), 'ro');
+        hold on;
+        plot(ts(pred(pred<N)-delay), ecgs(pred(pred<N, 1)-delay,signal), 'mp');
+        hold on;
+        text(ts(ann(ann<N)+1), max_ecg, type);                    
+        hold off;
+        ylabel('mV');
+        xlabel('signal');
+        grid on;
+        title([arqnum, ' sinal ', num2str(signal)]);
+
+        subplot(2,1,2);
+        plot(ts(1:N), ecgs_pt(1:N,signal));
+        hold on;
+        plot(ts(pred(pred < N)), ecgs_pt(pred(pred < N, 1),signal), 'ro');
+        hold off;
+        xlabel('s');
+        grid on;
+        title([arqnum, ' sinal ', num2str(signal), ' Pan-Thompkins']);
+        drawnow;
+    end
 end
+
+
+%% Estatísticas
+% Tabela
+casos = {'111.mat'; '112.mat'; '113.mat'; '114.mat'; '115.mat'; '116.mat'; '117.mat'; '118.mat'; '119.mat'};
+media_original = avg_ecg(:,1);
+dp_original = std_ecg(:,1);
+media_normalizado = avg_ecg_norm(:,1);
+dp_normalizado = std_ecg_norm(:,1);
+media_IRR_s = avg_IRR(:,1)./Fs;
+dp_IRR_s = std_IRR(:,1)./Fs;
+bpm = media_IRR_s*60;
+TP = TP(:,1);
+FP = FP(:,1);
+FN = FN(:,1);
+Nv = TP + FN; % número de QRSs verdadeiros
+Nd = TP + FP; % número de QRSs detectados
+prct_FP = 100 .* FP ./ Nv; % Porcentagem de falso-positivos
+prct_FN = 100 .* FN ./ Nv; % Porcentagem de falso-negativos
+
+res_table = table(casos, media_original, dp_original, ...
+    media_normalizado, dp_normalizado, Nv, ...
+    Nd, FP, prct_FP, FN, prct_FN, media_IRR_s, dp_IRR_s, bpm);
+
 fprintf('\n Fim \n');
 

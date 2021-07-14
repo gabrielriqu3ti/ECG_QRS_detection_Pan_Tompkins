@@ -3,7 +3,7 @@ FFT_ECG.m
 butterworth_ECG.m
 fft_mirror.m
 filter_MA_ECG.m
+norm_autocorrelation_ECG.m
 finite_derivative.m
 finite_derivative_ECG.m
-norm_autocorrelation_ECG.m
 project_ADC_for_ECG.m
