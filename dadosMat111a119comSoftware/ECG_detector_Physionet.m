@@ -7,26 +7,179 @@ clc;
 
 
 %% Parâmetros
+% Sinta-se livre para editar!
 low = true; % habilita filtro passa-baixa
 high = true; % habilita filtro passa-alta
+classic = false; % true : habilita o uso de filtros clássico desenvolvidos por 
+                % Pan-Tompkins para Fs = 200 Hz 
+                % false : habilita o uso de filtros customizados para Fs =
+                % 360 Hz
 graphics = true; % habilita exibição de gráficos
-N_int = 30; % número de elementos usados na integração
+N_int = 30*360/200; % número de elementos usados na integração
 signal = 1; % sinal estudade (1 ou 2)
-save = true; % salva gráficos e tábela
+save = true; % salva tábela
 
 
 %% Design de Filtros
+Fs = 360;
+f = logspace(0,3,100);
 % Passa-baixa
-num_low = [1, 0, 0, 0, 0, 0, -2, 0, 0, 0, 0, 0, 1];
-den_low = 36 .* [1, -2, 1];
+fc_low = 20; % 20 Hz
+if classic
+    num_low = [1, 0, 0, 0, 0, 0, -2, 0, 0, 0, 0, 0, 1];
+    den_low = 36 .* [1, -2, 1];
+else
+    order = 8;
+    filter_type = 'low';
+    num_low = fir1(order, 2*fc_low/Fs, filter_type);
+    den_low = 1;
+end
+if graphics
+    figure;
+    h = freqz(num_low, den_low, f, Fs);
+    h_abs = abs(h);
+    h_phase = angle(h);
+    subplot(2,1,1)
+    semilogx(f, 20*log10(h_abs), 'DisplayName', 'magnitude')
+    hold on
+    semilogx([1, 1000], [-3, -3], 'k:', 'DisplayName', '-3 dB')
+    hold on
+    semilogx([fc_low, fc_low], [-120, 60], 'k--', 'DisplayName', 'frequência de corte')
+    hold on
+    semilogx([Fs/2, Fs/2], [-120, 60], 'm--', 'DisplayName', 'frequência de Nyquist')
+    hold on
+    semilogx([Fs, Fs], [-120, 60], 'r--', 'DisplayName', 'frequência de amostragem')
+    hold off
+    grid on
+    xticks(cat(2, cat(2, 1:9, cat(2, 10:10:90, 100:100:Fs)), 400:600:1000))
+    yticks(-2000:20:2000)
+    ylim([-100, 20])
+    ylabel('Magnitude (dB)')
+    xlabel('Frequência (Hz)')
+    title('Diagrama de Bode de filtro passa-baixa')
+    legend('Location', 'southeast')
+    
+    subplot(2,1,2)
+    semilogx(f, (180/pi) .* h_phase, 'DisplayName', 'fase')
+    hold on
+    semilogx([fc_low, fc_low], [-200, 200], 'k--', 'DisplayName', 'frequência de corte')
+    hold on
+    semilogx([Fs/2, Fs/2], [-200, 200], 'm--', 'DisplayName', 'frequência de Nyquist')
+    hold on
+    semilogx([Fs, Fs], [-200, 200], 'r--', 'DisplayName', 'frequência de amostragem')
+    hold off
+    grid on
+    xticks(cat(2, cat(2, 1:9, cat(2, 10:10:90, 100:100:Fs)), 400:600:1000))
+    yticks(-360:90:360)
+    ylim([-200, 200])
+    ylabel('Fase (degraus)')
+    xlabel('Frequência (Hz)')
+    legend('Location', 'southeast')
+end
 
 % Passa-alta
-num_high = zeros(1,33);
-num_high(1,1) = -1;
-num_high(1,17) = 32;
-num_high(1,18) = -32;
-num_high(1,33) = 1;
-den_high = 32 .* [1, -1];
+fc_high = 5; % 5 Hz
+if classic
+    num_high = zeros(1,33);
+    num_high(1,1) = -1;
+    num_high(1,17) = 32;
+    num_high(1,18) = -32;
+    num_high(1,33) = 1;
+    den_high = 32 .* [1, -1];
+else
+    order = 4;
+    filter_type = 'high';
+    [num_high, den_high] = butter(order, 2*fc_high/Fs, filter_type);
+end
+if graphics
+    figure;
+    h = freqz(num_high, den_high, f, Fs);
+    h_abs = abs(h);
+    h_phase = angle(h);
+    subplot(2,1,1)
+    semilogx(f, 20*log10(h_abs), 'DisplayName', 'magnitude')
+    hold on
+    semilogx([1, 1000], [-3, -3], 'k:', 'DisplayName', '-3 dB')
+    hold on
+    semilogx([fc_high, fc_high], [-120, 60], 'k--', 'DisplayName', 'frequência de corte')
+    hold on
+    semilogx([Fs/2, Fs/2], [-120, 60], 'm--', 'DisplayName', 'frequência de Nyquist')
+    hold on
+    semilogx([Fs, Fs], [-120, 60], 'r--', 'DisplayName', 'frequência de amostragem')
+    hold off
+    grid on
+    xticks(cat(2, cat(2, 1:9, cat(2, 10:10:90, 100:100:Fs)), 400:600:1000))
+    yticks(-2000:20:2000)
+    ylim([-100, 20])
+    ylabel('Magnitude (dB)')
+    xlabel('Frequência (Hz)')
+    title('Diagrama de Bode de filtro passa-alta')
+    legend('Location', 'southeast')
+    
+    subplot(2,1,2)
+    semilogx(f, (180/pi) .* h_phase, 'DisplayName', 'fase')
+    hold on
+    semilogx([fc_high, fc_high], [-200, 200], 'k--', 'DisplayName', 'frequência de corte')
+    hold on
+    semilogx([Fs/2, Fs/2], [-200, 200], 'm--', 'DisplayName', 'frequência de Nyquist')
+    hold on
+    semilogx([Fs, Fs], [-200, 200], 'r--', 'DisplayName', 'frequência de amostragem')
+    hold off
+    grid on
+    xticks(cat(2, cat(2, 1:9, cat(2, 10:10:90, 100:100:Fs)), 400:600:1000))
+    yticks(-360:90:360)
+    ylim([-200, 200])
+    ylabel('Fase (degraus)')
+    xlabel('Frequência (Hz)')
+    legend('Location', 'southeast')
+    
+    num_res = conv(num_low, num_high);
+    den_res = conv(den_low, den_high);
+    figure;
+    h = freqz(num_res, den_res, f, Fs);
+    h_abs = abs(h);
+    h_phase = angle(h);
+    subplot(2,1,1)
+    semilogx(f, 20*log10(h_abs), 'DisplayName', 'magnitude')
+    hold on
+    semilogx([1, 1000], [-3, -3], 'k:', 'DisplayName', '-3 dB')
+    hold on
+    semilogx([fc_low, fc_low], [-120, 60], 'k--', 'DisplayName', 'frequência de corte do passa-baixa')
+    hold on
+    semilogx([fc_high, fc_high], [-120, 60], 'k--', 'DisplayName', 'frequência de corte do passa-alta')
+    hold on
+    semilogx([Fs/2, Fs/2], [-120, 60], 'm--', 'DisplayName', 'frequência de Nyquist')
+    hold on
+    semilogx([Fs, Fs], [-120, 60], 'r--', 'DisplayName', 'frequência de amostragem')
+    hold off
+    grid on
+    xticks(cat(2, cat(2, 1:9, cat(2, 10:10:90, 100:100:Fs)), 400:600:1000))
+    yticks(-2000:20:2000)
+    ylim([-100, 20])
+    ylabel('Magnitude (dB)')
+    xlabel('Frequência (Hz)')
+    title('Diagrama de Bode de filtro passa-banda')
+    legend('Location', 'southeast')
+    
+    subplot(2,1,2)
+    semilogx(f, (180/pi) .* h_phase, 'DisplayName', 'fase')
+    hold on
+    semilogx([fc_low, fc_low], [-200, 200], 'k--', 'DisplayName', 'frequência de corte do passa-baixa')
+    hold on
+    semilogx([fc_high, fc_high], [-200, 200], 'k--', 'DisplayName', 'frequência de corte do passa-alta')
+    hold on
+    semilogx([Fs/2, Fs/2], [-200, 200], 'm--', 'DisplayName', 'frequência de Nyquist')
+    hold on
+    semilogx([Fs, Fs], [-200, 200], 'r--', 'DisplayName', 'frequência de amostragem')
+    hold off
+    grid on
+    xticks(cat(2, cat(2, 1:9, cat(2, 10:10:90, 100:100:Fs)), 400:600:1000))
+    yticks(-360:90:360)
+    ylim([-200, 200])
+    ylabel('Fase (degraus)')
+    xlabel('Frequência (Hz)')
+    legend('Location', 'southeast')
+end
 
 % Derivação
 num_d_dt = [2, 1, 0, -1, -2];
@@ -74,14 +227,12 @@ for n =111:119
     % Passa-baixa
     if low
         ecgs_filt = filter(num_low, den_low, ecgs);
-        delay = delay + 5;
     else
         ecgs_filt = ecgs;
     end
     % Passa-alta
     if high
         ecgs_filt = filter(num_high, den_high, ecgs_filt);
-        delay = delay + 16;
     end
     
     
@@ -96,7 +247,6 @@ for n =111:119
 
     %% Derivada
     decgs_dt = filter(num_d_dt, den_d_dt, ecgs_norm);
-    delay = delay + 3;
     
     
     %% Quadrado
@@ -105,7 +255,6 @@ for n =111:119
     
     %% Integração
     ecgs_int = filter(num_int, den_int, decgs_dt_2);
-    delay = delay + round(N_int/2) - 7;
     
     
     %% Limiar Adaptativo
@@ -171,7 +320,6 @@ for n =111:119
     
     
     %% Avaliação
-    ecgs_pt = ecgs_int;
     pred = pred(pred(:,1) > 0,1);
     IRR = IRR(IRR(:,1) > 0, 1);
     avg_IRR(n-110,1) = mean(IRR);
@@ -245,9 +393,9 @@ for n =111:119
         title([arqnum, ' sinal ', num2str(signal)]);
 
         subplot(2,1,2);
-        plot(ts(1:N), ecgs_pt(1:N,signal));
+        plot(ts(1:N), ecgs_int(1:N,signal));
         hold on;
-        plot(ts(pred(pred < N)), ecgs_pt(pred(pred < N, 1),signal), 'ro');
+        plot(ts(pred(pred < N)), ecgs_int(pred(pred < N, 1),signal), 'ro');
         hold off;
         xlabel('s');
         grid on;
