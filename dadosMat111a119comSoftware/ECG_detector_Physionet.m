@@ -29,10 +29,8 @@ if classic
     num_low = [1, 0, 0, 0, 0, 0, -2, 0, 0, 0, 0, 0, 1];
     den_low = 36 .* [1, -2, 1];
 else
-    order = 8;
-    filter_type = 'low';
-    num_low = fir1(order, 2*fc_low/Fs, filter_type);
-    den_low = 1;
+    num_low = ones(1,8);
+    den_low = 8;
 end
 if graphics
     figure;
