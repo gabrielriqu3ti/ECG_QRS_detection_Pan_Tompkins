@@ -16,13 +16,13 @@ classic = false; % true : habilita o uso de filtros clássico desenvolvidos por
                 % 360 Hz
 graphics = true; % habilita exibição de gráficos
 N_int = 30*360/200; % número de elementos usados na integração
-signal = 1; % sinal estudade (1 ou 2)
+signal = 1; % sinal estudado (1 ou 2)
 save = true; % salva tábela
 
 
 %% Design de Filtros
 Fs = 360;
-f = logspace(0,3,100);
+f = logspace(0,3,1000);
 % Passa-baixa
 fc_low = 20; % 20 Hz
 if classic
