@@ -377,11 +377,11 @@ for n =111:119
         figure;
         max_ecg = max(ecgs(:,signal))*ones(Ntypes,1);
         subplot(2,1,1);
-        plot(ts(1:N), ecgs(1:N,signal));
+        plot(ts(1:N), ecgs(1:N,signal), 'DisplayName', 'ECG');
         hold on;
-        plot(ts(ann(ann<N)+1), ecgs(ann(ann<N)+1,signal), 'ro');
+        plot(ts(ann(ann<N)+1), ecgs(ann(ann<N)+1,signal), 'ro', 'DisplayName', 'QRS');
         hold on;
-        plot(ts(pred(pred<N)-delay), ecgs(pred(pred<N, 1)-delay,signal), 'mp');
+        plot(ts(pred(pred<N)-delay), ecgs(pred(pred<N, 1)-delay,signal), 'mp', 'DisplayName', 'QRS detectado');
         hold on;
         text(ts(ann(ann<N)+1), max_ecg, type);                    
         hold off;
@@ -389,15 +389,17 @@ for n =111:119
         xlabel('signal');
         grid on;
         title([arqnum, ' sinal ', num2str(signal)]);
+        legend('Location', 'southeast')
 
         subplot(2,1,2);
-        plot(ts(1:N), ecgs_int(1:N,signal));
+        plot(ts(1:N), ecgs_int(1:N,signal), 'DisplayName', 'ECG após operações de Pan-Tompkins');
         hold on;
-        plot(ts(pred(pred < N)), ecgs_int(pred(pred < N, 1),signal), 'ro');
+        plot(ts(pred(pred < N)), ecgs_int(pred(pred < N, 1),signal), 'ro', 'DisplayName', 'QRS detectados');
         hold off;
         xlabel('s');
         grid on;
         title([arqnum, ' sinal ', num2str(signal), ' Pan-Thompkins']);
+        legend('Location', 'southeast')
         drawnow;
     end
 end
