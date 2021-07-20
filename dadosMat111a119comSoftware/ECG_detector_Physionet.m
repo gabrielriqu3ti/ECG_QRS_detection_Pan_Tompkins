@@ -271,9 +271,9 @@ for n =111:119
     RR_MISSED_LIMIT = 2*Fs;
     % Loop
     for i=3:N
-        if (ecgs_int(i,signal) - ecgs_int(i-1,signal))*(ecgs_int(i-1,signal) - ecgs_int(i-2,signal)) < 0 % mudança de sinal
-            if pred_size > 1
-                if (ecgs_int(i,signal) > THRESHOLD_I1) && (i - pred(pred_size,1) > RR_LOW_LIMIT)% QRS encontrado
+        if pred_size > 1
+            if ((ecgs_int(i,signal) - ecgs_int(i-1,signal))*(ecgs_int(i-1,signal) - ecgs_int(i-2,signal)) < 0) && (i - pred(pred_size,1) > RR_LOW_LIMIT)% mudança de sinal
+                if (ecgs_int(i,signal) > THRESHOLD_I1)% QRS encontrado
                     SPKI = 0.125*ecgs_int(i,signal) + 0.875*SPKI;
                     pred(pred_size+1,1) = i;
                     pred_size = pred_size + 1;
@@ -281,7 +281,9 @@ for n =111:119
                 else % ruído encontrado
                     NPKI = 0.125*ecgs_int(i,signal) + 0.875*NPKI;
                 end
-            else
+            end
+        else
+            if (ecgs_int(i,signal) - ecgs_int(i-1,signal))*(ecgs_int(i-1,signal) - ecgs_int(i-2,signal)) < 0 % mudança de sinal
                 if ecgs_int(i,signal) > THRESHOLD_I1 % QRS encontrado
                     SPKI = 0.125*ecgs_int(i,signal) + 0.875*SPKI;
                     pred(pred_size+1,1) = i;
@@ -305,7 +307,7 @@ for n =111:119
                     % Implementar detecção retroativa
                     [peak, peak_i] = max(ecgs_int(pred(pred_size)+round(RR_LOW_LIMIT):i,signal));
                     peak_i = peak_i + pred(pred_size) + round(RR_LOW_LIMIT) - 1;
-                    SPKI = 0.125*peak + 0.875*SPKI;
+                    SPKI = 0.25*peak + 0.75*SPKI;
                     pred(pred_size+1,1) = peak_i;
                     pred_size = pred_size + 1;
                     IRR(pred_size-1,1) = pred(pred_size,1) - pred(pred_size-1,1);
